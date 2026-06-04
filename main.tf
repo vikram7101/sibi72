@@ -18,36 +18,63 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
-variable "instance_name" {
-  type    = string
-  default = "apache-web-server"
-}
-
-variable "public_key_path" {
-  type    = string
-  default = "/Users/apple/.ssh/id_rsa.pub"
-}
-
-variable "private_key_path" {
-  type    = string
-  default = "/Users/apple/.ssh/id_rsa"
-}
-
-variable "html_source_dir" {
-  type    = string
-  default = "/Users/apple/Downloads/html5up-massively/site"
-}
-
 ################################
 # PROVIDER
 ################################
 
 provider "aws" {
   region = var.aws_region
-  # Credentials are automatically read from:
-  # AWS_ACCESS_KEY_ID
-  # AWS_SECRET_ACCESS_KEY
-  # AWS_DEFAULT_REGION
+}
+
+################################
+# IAM ROLE FOR SSM
+################################
+
+resource "aws_iam_role" "ssm_role" {
+  name = "ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_attach" {
+  role       = aws_iam_role.ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ssm_profile" {
+  name = "ec2-ssm-profile"
+  role = aws_iam_role.ssm_role.name
+}
+
+################################
+# SECURITY GROUP
+################################
+
+resource "aws_security_group" "web" {
+  name = "ssm-web-sg"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 ################################
@@ -65,99 +92,25 @@ data "aws_ami" "amazon_linux" {
 }
 
 ################################
-# KEY PAIR
-################################
-
-resource "aws_key_pair" "deployer" {
-  key_name   = "terraform-ec2-key"
-  public_key = file(var.public_key_path)
-}
-
-################################
-# SECURITY GROUP
-################################
-
-resource "aws_security_group" "web" {
-  name        = "terraform-web-sg"
-  description = "Allow HTTP and SSH"
-
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-################################
 # EC2 INSTANCE
 ################################
 
 resource "aws_instance" "web" {
-  ami           = data.aws_ami.amazon_linux.id
-  instance_type = "t3.micro"
-  key_name      = aws_key_pair.deployer.key_name
-  security_groups = [
-    aws_security_group.web.name
-  ]
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = "t3.micro"
+  iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
+  vpc_security_group_ids      = [aws_security_group.web.id]
 
   user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              yum install -y httpd
-              systemctl enable httpd
-              systemctl start httpd
-              EOF
+    #!/bin/bash
+    yum update -y
+    yum install -y httpd amazon-ssm-agent
+    systemctl enable httpd amazon-ssm-agent
+    systemctl start httpd amazon-ssm-agent
+  EOF
 
   tags = {
-    Name = var.instance_name
-  }
-
-  ################################
-  # SSH CONNECTION
-  ################################
-
-  connection {
-    type        = "ssh"
-    host        = self.public_ip
-    user        = "ec2-user"
-    private_key = file(var.private_key_path)
-    timeout     = "2m"
-  }
-
-  ################################
-  # PROVISIONERS
-  ################################
-
-  provisioner "file" {
-    source      = var.html_source_dir
-    destination = "/tmp/html"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo rm -rf /var/www/html/*",
-      "sudo cp -r /tmp/html/* /var/www/html/",
-      "sudo chown -R apache:apache /var/www/html",
-      "sudo systemctl restart httpd"
-    ]
+    Name = "ssm-apache-server"
   }
 }
 
@@ -165,6 +118,10 @@ resource "aws_instance" "web" {
 # OUTPUT
 ################################
 
-output "web_public_ip" {
+output "instance_id" {
+  value = aws_instance.web.id
+}
+
+output "public_ip" {
   value = aws_instance.web.public_ip
 }

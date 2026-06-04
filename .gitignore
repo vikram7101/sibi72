@@ -2,7 +2,7 @@
 assets/
 images/
 site/
-
+f
 # Terraform local files
 .terraform/
 terraform.tfstate

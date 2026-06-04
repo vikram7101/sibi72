@@ -9,33 +9,13 @@ terraform {
   }
 }
 
-
+################################
+# VARIABLES
+################################
 
 variable "aws_region" {
   type    = string
   default = "us-east-1"
-}
-
-variable "aws_credentials_path" {
-  type    = string
-  default = "./aws.txt"
-}
-
-locals {
-  aws_credentials_lines = [for line in split("\n", trimspace(file(var.aws_credentials_path))) : trimspace(line) if trimspace(line) != ""]
-  aws_credentials_map = {
-    for line in local.aws_credentials_lines :
-    regex("^export\\s+([^=]+)=\\\"?(.*)\\\"?$$", line)[0] => trimspace(regex("^export\\s+([^=]+)=\\\"?(.*)\\\"?$$", line)[1])
-  }
-  aws_access_key       = local.aws_credentials_map["AWS_ACCESS_KEY_ID"]
-  aws_secret_key       = local.aws_credentials_map["AWS_SECRET_ACCESS_KEY"]
-  aws_region_from_file = lookup(local.aws_credentials_map, "AWS_DEFAULT_REGION", var.aws_region)
-}
-
-provider "aws" {
-  region     = local.aws_region_from_file
-  access_key = local.aws_access_key
-  secret_key = local.aws_secret_key
 }
 
 variable "instance_name" {
@@ -55,8 +35,24 @@ variable "private_key_path" {
 
 variable "html_source_dir" {
   type    = string
-  default = "/Users/apple/Downloads/html5up-massively/site" # set this to your local HTML folder root
+  default = "/Users/apple/Downloads/html5up-massively/site"
 }
+
+################################
+# PROVIDER
+################################
+
+provider "aws" {
+  region = var.aws_region
+  # Credentials are automatically read from:
+  # AWS_ACCESS_KEY_ID
+  # AWS_SECRET_ACCESS_KEY
+  # AWS_DEFAULT_REGION
+}
+
+################################
+# AMI
+################################
 
 data "aws_ami" "amazon_linux" {
   most_recent = true
@@ -68,10 +64,18 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+################################
+# KEY PAIR
+################################
+
 resource "aws_key_pair" "deployer" {
   key_name   = "terraform-ec2-key"
   public_key = file(var.public_key_path)
 }
+
+################################
+# SECURITY GROUP
+################################
 
 resource "aws_security_group" "web" {
   name        = "terraform-web-sg"
@@ -102,6 +106,10 @@ resource "aws_security_group" "web" {
   }
 }
 
+################################
+# EC2 INSTANCE
+################################
+
 resource "aws_instance" "web" {
   ami           = data.aws_ami.amazon_linux.id
   instance_type = "t3.micro"
@@ -122,6 +130,10 @@ resource "aws_instance" "web" {
     Name = var.instance_name
   }
 
+  ################################
+  # SSH CONNECTION
+  ################################
+
   connection {
     type        = "ssh"
     host        = self.public_ip
@@ -129,6 +141,10 @@ resource "aws_instance" "web" {
     private_key = file(var.private_key_path)
     timeout     = "2m"
   }
+
+  ################################
+  # PROVISIONERS
+  ################################
 
   provisioner "file" {
     source      = var.html_source_dir
@@ -144,6 +160,10 @@ resource "aws_instance" "web" {
     ]
   }
 }
+
+################################
+# OUTPUT
+################################
 
 output "web_public_ip" {
   value = aws_instance.web.public_ip

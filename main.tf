@@ -27,8 +27,8 @@ locals {
     for line in local.aws_credentials_lines :
     regex("^export\\s+([^=]+)=\\\"?(.*)\\\"?$$", line)[0] => trimspace(regex("^export\\s+([^=]+)=\\\"?(.*)\\\"?$$", line)[1])
   }
-  aws_access_key = local.aws_credentials_map["AWS_ACCESS_KEY_ID"]
-  aws_secret_key = local.aws_credentials_map["AWS_SECRET_ACCESS_KEY"]
+  aws_access_key       = local.aws_credentials_map["AWS_ACCESS_KEY_ID"]
+  aws_secret_key       = local.aws_credentials_map["AWS_SECRET_ACCESS_KEY"]
   aws_region_from_file = lookup(local.aws_credentials_map, "AWS_DEFAULT_REGION", var.aws_region)
 }
 

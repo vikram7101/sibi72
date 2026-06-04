@@ -1,0 +1,37 @@
+name: Deploy Website via SSM
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Zip website files
+        run: zip -r site.zip .
+
+      - name: Upload & deploy via SSM
+        run: |
+          aws ssm send-command \
+            --region $AWS_REGION \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy website" \
+            --parameters commands="[
+              \"yum install -y unzip\",
+              \"rm -rf /var/www/html/*\",
+              \"aws s3 cp s3://dummy-bucket/site.zip /tmp/site.zip || true\",
+              \"unzip -o /tmp/site.zip -d /var/www/html\",
+              \"systemctl restart httpd\"
+            ]"

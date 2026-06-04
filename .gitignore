@@ -1,0 +1,17 @@
+# Ignore built/generated site content and static assets
+assets/
+images/
+site/
+
+# Terraform local files
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.lock.hcl
+
+# Local environment files
+.env
+aws.txt
+
+# macOS files
+.DS_Store

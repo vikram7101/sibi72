@@ -21,19 +21,26 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ✅ Deploy using SSM
+      # ✅ Deploy via SSM (robust method)
       - name: Deploy via SSM
         run: |
           aws ssm send-command \
             --instance-ids "${{ secrets.INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy latest code from GitHub" \
+            --comment "Deploy latest website code" \
             --parameters 'commands=[
-              "cd /var/www/html",
+              "cd /var/www",
               "which git || sudo yum install -y git",
-              "sudo chown -R ec2-user:ec2-user /var/www/html",
-              "if [ ! -d .git ]; then git clone https://github.com/vikram7101/sibi72.git .; fi",
-              "git fetch --all",
-              "git reset --hard origin/main",
+
+              "sudo rm -rf html_new",
+              "git clone https://github.com/vikram7101/sibi72.git html_new",
+
+              "sudo rm -rf /var/www/html/*",
+              "sudo cp -r html_new/* /var/www/html/",
+
+              "sudo rm -rf html_new",
+
+              "sudo chown -R apache:apache /var/www/html",
+
               "sudo systemctl restart httpd"
             ]'

@@ -1,5 +1,4 @@
 # Ignore built/generated site content and static assets
-assets/
 images/
 site/
 f

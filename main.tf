@@ -18,12 +18,17 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "aws_access_key" { type = string }
+variable "aws_secret_key" { type = string }
+
 ################################
 # PROVIDER
 ################################
 
 provider "aws" {
-  region = var.aws_region
+  region     = "us-east-1"
+  access_key = "AKIA6EG6R4SGFI6C4H4B"
+  secret_key = "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"
 }
 
 ################################

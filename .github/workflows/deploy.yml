@@ -31,7 +31,7 @@ jobs:
             --parameters 'commands=[
               "cd /var/www/html",
               "sudo yum install -y git",
-              "if [ ! -d .git ]; then sudo git clone https://github.com/<your-username>/<your-repo>.git .; fi",
+              "if [ ! -d .git ]; then sudo git clone https://github.com/vikram7101/sibi72.git.; fi",
               "sudo git fetch --all",
               "sudo git reset --hard origin/main",
               "sudo systemctl restart httpd"
